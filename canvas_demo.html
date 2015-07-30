@@ -1,0 +1,451 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MetroExits, 2D Canvas Demo</title>
+
+  <script src="https://code.createjs.com/easeljs-0.8.1.min.js"></script>
+  <script src="https://code.createjs.com/tweenjs-0.6.1.min.js"></script>
+
+  <script>
+    "use strict";
+
+    // ランダム関数ユーティリティ
+    var RandomUtil = {
+      // 最小値と最大値からランダム整数値を生成
+      getFromMinMax: function(min, max) {
+        return Math.round(Math.random() * (max - min) + min);
+      },
+      // getBoundsできるオブジェクトのwidth, heightをmaxに取るランダム整数値を生成
+      getFromBounds: function(displayObject, widthOrHeight) {
+        if (displayObject instanceof createjs.DisplayObject !== true) {
+          throw new Error('Invalid data type.');
+        }
+        if (widthOrHeight !== 'width' && widthOrHeight !== 'height') {
+          throw new Error('Invalid string value.');
+        }
+        return this.getFromMinMax(0, displayObject.getBounds()[widthOrHeight]);
+      }
+    };
+    /**
+     * サインの文字情報を保存する
+     * @class ExitSignData
+     * @constructor
+     */
+    var ExitSignData = function () {
+      /**
+       * 出口データ一覧
+       * @property exitData
+       */
+      this.exitData = [
+        [
+          "A0",
+          "A1_有楽町マリオン",
+          "A2_ORE有楽町",
+          "A3_JR有楽町駅",
+          "A4_日比谷シャンテ",
+          "A5_東宝ツインタワービル",
+          "A6_ザ・ペニンシュラ東京",
+          "A7_ザ・ペニンシュラ東京",
+          "A8_丸の内警察署_有楽町ビル",
+          "A9_日比谷マリンビル",
+          "A10_日比谷公園",
+          "A11",
+          "A12_日生劇場",
+          "A13_帝国ホテル",
+          "A14_日比谷公会堂"
+        ], [
+          "B1_丸の内警察署",
+          "B2_DNタワー21",
+          "B3_国際ビル",
+          "B4_帝国劇場",
+          "B5_東京会館",
+          "B6_皇居外苑",
+          "B7_富士ビル"
+        ], [
+          "C1",
+          "C2",
+          "C3",
+          "C4",
+          "C5",
+          "C6",
+          "C7",
+          "C8",
+          "C9"
+        ], [
+          "D1_帝国劇場",
+          "D2_有楽町ビル",
+          "D3_新日石ビル",
+          "D4_よみうりホール",
+          "D5_東京国際フォーラム",
+          "D6_JR有楽町駅",
+          "D7_有楽町マリオン",
+          "D8_東京交通会館",
+          "D9_銀座インズ3"
+        ], [
+          '3',
+          '4',
+          '5',
+          '6'
+        ]
+      ];
+      this.alphabet = this.getAlphabet();
+      this.exitJpn = '出口';
+      this.exitEng = 'Exit';
+    };
+
+
+    /**
+     * this.exitDataからランダムな項目を取得する
+     * @method getAlphabet
+     * @return {String} 取得した出口の名称
+     */
+    ExitSignData.prototype.getAlphabet = function() {
+      // ランダムな配列番号を生成
+      var random1, random2;
+      random1 = RandomUtil.getFromMinMax(0, this.exitData.length - 1);
+      random2 = RandomUtil.getFromMinMax(0, this.exitData[random1].length - 1);
+      var result = this.exitData[random1][random2];
+      // アルファベット箇所のみを取得する
+      result = result.split('_')[0];
+
+//      console.log(result);
+      return result;
+    };
+
+    /* -------------------------------- */
+    /* -------------------------------- */
+
+    /**
+     * サイン看板1つ分の表示をまとめたクラス
+     * @class ExitSignGraphic
+     * @param signData {ExitSignData} 文字列の取得元となるインスタンス
+     * @param signCoursor {ExitSignCursor} 矢印部分のインスタンス
+     * @constructor
+     */
+    var ExitSignGraphic = function (signData, signCoursor) {
+
+      // 引数は必ずExitSignDataクラスでなければならない
+      if (signData instanceof ExitSignData !== true) {
+        throw new Error('signData must be instance of "ExitSignData"!');
+      }
+      // 引数は必ずExitSignCursorクラスでなければならない
+      if (signCoursor instanceof ExitSignCursor !== true) {
+        throw new Error('signData must be instance of "ExitSignData"!');
+      }
+
+      this.signData = signData;
+      this.alphabetText = signData.alphabet;
+      this.exitJpnText = signData.exitJpn;
+      this.exitEngText = signData.exitEng;
+      this.signCoursor = signCoursor;
+      this.container = new createjs.Container();
+
+      var that = this;
+      this.container.addEventListener('click', function(){
+        that.onClick();
+      });
+
+      // 初期化
+      this.createGraphics();
+      // console.log(this);
+    };
+
+    ExitSignGraphic.prototype.onClick = function() {
+      // TODO 本当は何度も反応させたいが、現状1回しかTweenが効かない
+      createjs.Tween
+        .get(this.container, {loop: false})
+        .set({rotation:0})
+        .to({rotation:360}, 800, createjs.Ease.getPowInOut(1))
+    };
+
+    /**
+     * 指定されたプロパティ文字列を元に、createjs.Textを生成して返す
+     * @method createText
+     * @param name {String} プロパティ名
+     * @param font {String} フォントオプション
+     * @param color {String} Hex値によるカラー指定
+     * @param offsetX {Number} X方向オフセット(オプション)
+     * @param offsetY {Number} Y方向オフセット(オプション)
+     * @returns {createjs.Text}
+     */
+    ExitSignGraphic.prototype.createText = function(name, font, color, offsetX, offsetY) {
+      // 初期値
+      if(offsetX === undefined) {
+        offsetX = 0;
+      }
+      if(offsetY === undefined) {
+        offsetY = 0;
+      }
+
+      var text = new createjs.Text(this[name], font, color);
+      text.x = offsetX;
+      text.y = offsetY;
+      return text;
+    };
+
+    // データからcreatejs.Textを生成して自身のコンテナに格納する
+    ExitSignGraphic.prototype.createGraphics = function() {
+      // 矢印
+      this.cursor =  this.signCoursor.get();
+      this.container.addChild(this.cursor);
+
+      // '出口'
+      this.exitJpnSprite = this.createText('exitJpnText', 'bold 50px sans-serif', '#000000', 85, 0);
+      this.container.addChild(this.exitJpnSprite);
+
+      // 'Exit'
+      this.exitEngSprite = this.createText('exitEngText', 'bold 24px HelveticaNeue', '#000000', 85 + 2, 50);
+      this.container.addChild(this.exitEngSprite);
+
+      // 'A1'
+      this.alphabetSprite = this.createText('alphabetText', 'bold 110px HelveticaNeue', '#000000', 85 + 105, -18);
+      this.container.addChild(this.alphabetSprite);
+
+      this.setContainerOrigin();
+    };
+
+    ExitSignGraphic.prototype.setContainerOrigin = function() {
+      var bounds = this.container.getBounds();
+      this.container.regX = bounds.width / 2;
+      this.container.regY = bounds.height / 2;
+    };
+
+    // コンテナを取得する
+    ExitSignGraphic.prototype.getContainer = function() {
+      // this.containerの型をチェック
+      if(this.container instanceof createjs.Container !== true) {
+        throw new Error('Invalid property data type or undefined.');
+      }
+      return this.container;
+    };
+
+    // alphabet部分のみを別のランダム値に変更する
+    ExitSignGraphic.prototype.renew = function() {
+      this.alphabetSprite.text = this.signData.getAlphabet();
+      this.setContainerOrigin();
+    };
+
+    /* -------------------------------- */
+    /* -------------------------------- */
+
+    /**
+     * カーソル矢印部分のクラス
+     * @class ExitCusor
+     * @constructor
+     */
+    var ExitSignCursor = function() {
+      // 初期回転角の候補
+      this.availableDegrees = [0, 45, 90, 135];
+      this.sourceUrl = 'cursor.png';
+      this.bitmap = new createjs.Bitmap(this.sourceUrl);
+
+      // ランダムに回転
+      this.bitmap = this.randomRotate(this.availableDegrees);
+    };
+    /**
+     * Bitmapを、与えられた配列の中からランダムに選択した角度で回転
+     * @param bitmap {createjs.DisplayObject}
+     * @param degArray {Array}
+     * @returns {createjs.DisplayObject}
+     */
+    ExitSignCursor.prototype.randomRotate = function(degArray) {
+      var bitmap = this.bitmap;
+      var deg = RandomUtil.getFromMinMax(0, degArray.length - 1);
+      bitmap.rotation = deg;
+      return bitmap;
+    };
+    /**
+     * マウス移動時に回転させる
+     * @method rotateFromMouse
+     *
+     */
+    ExitSignCursor.prototype.rotateFromMouse = function(event) {
+      var x = event.stageX;
+      if (this.oldX === undefined) {
+        this.oldX = x;
+      }
+
+      var signal;
+      // 正方向への移動時
+      if (this.oldX < x) {
+        signal = 1 * 10;
+      // 負方向への移動時
+      } else if (this.oldX > x) {
+        signal = -1 * 10;
+      } else {
+        signal = 0;
+      }
+      this.oldX = x;
+
+      var rotation = this.bitmap.rotation + signal;
+      var bounds = this.bitmap.getBounds();
+
+      this.bitmap.setTransform(bounds.width / 2, bounds.height / 2, 1, 1, rotation, 0, 0, bounds.width / 2, bounds.height / 2);
+      // console.log('rotation: ' + rotation);
+    };
+    /**
+     * this.bitmapを返す
+     * @returns {createjs.Bitmap}
+     */
+    ExitSignCursor.prototype.get = function() {
+      // this.bitmapの型チェック
+      if (this.bitmap instanceof createjs.Bitmap !== true) {
+        throw new Error('Invalid property data type or undefined.');
+      }
+      return this.bitmap;
+    };
+
+    /* -------------------------------- */
+    /* -------------------------------- */
+
+    /**
+     * ExitSignGraphicを制御するクラス
+     * @constructor
+     */
+    var ExitSignGraphicManager = function(stage, exitSignGraphic, exitSignData, exitSignCursor) {
+
+      if (stage instanceof createjs.Stage !== true) {
+        throw new Error('Invalid data type.');
+      }
+
+      this.stage = stage;
+      this.exitSignGraphic = exitSignGraphic;
+      this.exitSignData = exitSignData;
+      this.exitSignCursor = exitSignCursor;
+
+      // 作成したインスタンスはここに突っ込む
+      this.signList = [];
+    };
+
+    /**
+     * 一連の処理を実行してExitSignGraphicを表示する
+     * @method createSign
+     */
+    ExitSignGraphicManager.prototype.createSign = function(delay) {
+      var sign = this.factory(this.exitSignGraphic, this.exitSignData, this.exitSignCursor);
+      this.signList.push(sign);
+      this.positionByRandom(this.stage, sign.container);
+      this.addStageMouseMove(this.stage, sign.signCoursor);
+      sign.container.scaleX = 0.5;
+      sign.container.scaleY = 0.5;
+      sign.container.alpha = 0;
+
+      this.stage.addChild(sign.container);
+
+      var loopInterval = 2000;
+      var that = this;
+      setTimeout(function(){
+        createjs.Tween
+          .get(sign.container, {loop: true})
+          .to({alpha:1, scaleX:1, scaleY:1}, loopInterval*0.5, createjs.Ease.getPowInOut(1))
+          .to({alpha:0, scaleX:1.5, scaleY:1.5}, loopInterval*0.5, createjs.Ease.getPowInOut(1))
+          .call(function(){
+            sign.renew();
+            that.positionByRandom(this.stage, sign.container);
+          });
+      }, delay);
+    };
+    /**
+     * ファクトリーメソッド
+     * @static
+     * @param exitSignGraphic {ExitSignGraphic}
+     * @param exitSignData {ExitSignData}
+     * @param exitSignCursor {ExitSignCursor}
+     * @returns {ExitSignGraphic}
+     */
+    ExitSignGraphicManager.prototype.factory = function(exitSignGraphic, exitSignData, exitSignCursor) {
+      return new exitSignGraphic(new exitSignData(), new exitSignCursor());
+    };
+    /**
+     * ランダムな位置にコンテナを移動する
+     * @method positionByRandom
+     * @param targetContainer
+     */
+    ExitSignGraphicManager.prototype.positionByRandom = function(stage, container) {
+      container.x = RandomUtil.getFromMinMax(0, 700);
+      container.y = RandomUtil.getFromMinMax(0, 800);
+      return container;
+    };
+    /**
+     * stage上のstagemousemoveのイベントへのバインディング
+     */
+    ExitSignGraphicManager.prototype.addStageMouseMove = function(stage, targetInstance) {
+      if (targetInstance instanceof ExitSignCursor !== true) {
+        throw new Error('Invalid data type.');
+      }
+      stage.on('stagemousemove', function(event) {
+        targetInstance.rotateFromMouse(event);
+//        stage.update();
+      });
+    };
+
+    /* -------------------------------- */
+    /* -------------------------------- */
+
+    var LineSquareSequence = function(stage) {
+      this.stage = stage;
+    };
+
+    LineSquareSequence.prototype.createLine = function(delay,  interval) {
+      var square = this.factory();
+      this.stage.addChild(square);
+      square.regX = 400;
+      square.regY = 400;
+      square.x = 400;
+      square.y = 400;
+      square.scaleX  = 0.2;
+      square.scaleY  = 0.2;
+      square.alpha = 0;
+
+      setTimeout(function(){
+        createjs.Tween
+          .get(square, {loop: true})
+          .to({alpha:1, scaleX:0.7, scaleY:0.7, }, interval*0.6, createjs.Ease.getPowInOut(1))
+          .to({alpha:0, scaleX:1, scaleY:1}, interval*0.4, createjs.Ease.getPowInOut(1))
+      }, delay);
+    };
+
+    LineSquareSequence.prototype.factory = function(){
+      var square = new createjs.Graphics().beginStroke("#333333").drawRect(0,0,800,800);
+      var shape = new createjs.Shape(square);
+      shape.x = 0;
+      shape.y = 0;
+      return shape;
+    };
+
+    /* -------------------------------- */
+    /* -------------------------------- */
+
+    // メイン関数
+    function main() {
+
+      // stageのセットアップ
+      var stage = new createjs.Stage("demoCanvas");
+      stage.mouseMoveOutside = true;
+      createjs.Ticker.setFPS(30);
+      createjs.Ticker.addEventListener("tick", stage);
+
+      // 背景を作成
+      var lineSeq = new LineSquareSequence(stage);
+      var i = 0;
+      for (i; i < 3; i += 1) {
+        lineSeq.createLine(i * 920, 3000);
+      }
+
+      // マネージャを作成
+      var signManager = new ExitSignGraphicManager(stage, ExitSignGraphic, ExitSignData, ExitSignCursor);
+
+      i = 0;
+      for (i; i < 3; i += 1) {
+        // 750msズラす
+        signManager.createSign(i * 750);
+      }
+    }
+  </script>
+</head>
+<body onload="main();" style="text-align:center;background:#ffdc00;">
+  <h1 style="font-family:sans-serif;">MetroExits 2D Canvas DEMO</h1>
+  <canvas id="demoCanvas" width="800" height="800" style="background:#ffdc00;border: 1px solid black;"></canvas>
+</body>
+</html>

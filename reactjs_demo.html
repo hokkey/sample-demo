@@ -1,0 +1,208 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reactjs Demo</title>
+
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+  <script src="http://fb.me/react-0.13.3.js"></script>
+  <script src="http://fb.me/JSXTransformer-0.13.3.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+  <style>
+    .tagBubble {
+      margin-right: 0.5em;
+    }
+    .stockList__inner {
+      border: 1px solid #ddd;
+      padding: 1em;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="content" class="container"></div>
+
+  <script type="text/jsx">
+
+    // 全体 > 記事一覧 > 記事単体
+    var Stock = React.createClass({
+      render: function() {
+
+        var tags = React.Children.map(this.props.children, function(child) {
+          var tagUrl = 'http://qiita.com/tags/' + child;
+          return <a className="tagBubble btn btn-primary btn-xs" href={tagUrl} target="_blank">{child}</a>
+        });
+
+        var articleHref = this.props.url;
+        var authorHref = 'http://qiita.com/' + this.props.author;
+
+        return (
+          <div className="col-md-4 stockList__item">
+            <article className="stockList__inner">
+              <h2 className="h3">
+                <a href={articleHref}>{this.props.title}</a>
+              </h2>
+              <p>
+                <a href={authorHref}>{this.props.author}さん</a>
+              </p>
+              {tags}
+            </article>
+          </div>
+        )
+      }
+    });
+
+    // 全体 > 記事一覧
+    var StockList = React.createClass({
+      render: function() {
+        var stockNodes = this.props.data.map(function (stock) {
+          console.log('stock', stock);
+          return (
+            <Stock author={stock.user.id} title={stock.title} url={stock.url}>
+              {stock.tags.map(function(tag){return tag.name})}
+            </Stock>
+          );
+        });
+        return (
+          <div className="stockList">
+            {stockNodes}
+          </div>
+        );
+      }
+    });
+
+    // 全体
+    var StockBox = React.createClass({
+      // Stateを設定
+      getInitialState: function() {
+        return {data: [],
+                // ページ
+                page: 1,
+                // ユーザー名
+                userName: 'y_hokkey',
+                // 記事数
+                perPage: 5
+        };
+      },
+      // APIと通信
+      loadStocksFromServer: function() {
+        $.ajax({
+          url: 'https://qiita.com/api/v2/users/' + this.state.userName + '/stocks?page=' + this.state.page + '&per_page=' + this.state.perPage,
+          dataType: 'json',
+          success: function(data) {
+            this.setState({data: data});
+            console.log(data);
+          }.bind(this),
+          error: function(xhr, status, err) {
+            console.error(this.state.username, status, err.toString());
+          }.bind(this)
+        });
+      },
+      componentDidMount: function() {
+        this.loadStocksFromServer()
+      },
+      // userNameを変更する
+      changeUserName: function(userName) {
+        this.setState({
+          userName: userName
+        });
+        console.log(userName);
+        this.loadStocksFromServer();
+      },
+      // 次のページに進む
+      nextPage: function(page) {
+        this.setState({
+          page: page += 1
+        });
+        this.loadStocksFromServer();
+      },
+      // 前のページに戻る
+      prevPage: function(page) {
+        if(page > 1) {
+          this.setState({
+            page: page -= 1
+          });
+          this.loadStocksFromServer();
+        }
+      },
+      render: function() {
+        return (
+          <div className="stockBox">
+            <p><small>※検索し過ぎるとAPI制限でエラーになります</small></p>
+            <div>
+              <SearchInput userName={this.state.userName} onKeyDown={this.changeUserName} />
+              <PrevBtn page={this.state.page} onPrev={this.prevPage} />
+              <NextBtn page={this.state.page} onNext={this.nextPage} />
+            </div>
+            <StockList data={this.state.data} />
+
+          </div>
+        );
+      }
+    });
+
+    var SearchInput = React.createClass({
+      propTypes: {
+        onSubmit: React.PropTypes.func.isRequired
+      },
+      // 親メソッドに値を送り付ける
+      onKeyDown: function(e) {
+        if (e.keyCode === 13) {
+          console.log('Enter!');
+          this.props.onKeyDown(e.target.value);
+        }
+      },
+      render: function() {
+        return(
+          <label>ユーザ名: <input type="text" onKeyDown={this.onKeyDown} defaultValue={this.props.userName} /></label>
+        );
+      }
+    });
+
+    // 全体 > 次ボタン
+    var NextBtn = React.createClass({
+      propTypes: {
+        onNext: React.PropTypes.func.isRequired
+      },
+      // クリックしたら次のページにすすむ
+      _onNext: function() {
+        this.props.onNext(this.props.page);
+      },
+      render: function() {
+        return (
+          <a className="btn btn-default" onClick={this._onNext}>次へ</a>
+        );
+      }
+    });
+
+    // 全体 > 前ボタン
+    var PrevBtn = React.createClass({
+      propTypes: {
+        onPrev: React.PropTypes.func.isRequired
+      },
+      // クリックしたら前に戻る
+      _onPrev: function() {
+        this.props.onPrev(this.props.page);
+      },
+      render: function() {
+        var disabled = false;
+        if(this.props.page === 1) {
+          disabled = true;
+        }
+        return (
+          <a className="btn btn-default" onClick={this._onPrev} disabled={disabled} >前へ</a>
+        );
+      }
+    });
+
+    React.render(<StockBox />, document.getElementById('content'));
+
+  </script>
+
+  <div id="app"></div>
+
+</body>
+</html>
